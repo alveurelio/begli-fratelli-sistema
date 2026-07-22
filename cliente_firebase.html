@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Begli Fratelli's — Pedir en Línea</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
+:root{--red:#c41e3a;--green:#2d8659;--gray:#f5f5f5;--border:#ddd;--text:#333;--text2:#666}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f0f0f0;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+
+.phone{max-width:380px;width:100%;background:white;border-radius:20px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.15)}
+
+.head{background:linear-gradient(135deg,var(--red),var(--green));padding:18px 16px;color:white;text-align:center;position:relative}
+.head-logo{font-size:32px;margin-bottom:6px}
+.head-name{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
+.head-mesa{font-size:12px;opacity:.9;margin-top:4px}
+
+.status{
+  position:absolute;top:8px;right:8px;
+  width:10px;height:10px;border-radius:50%;
+  background:#ccc;animation:pulse 2s infinite;
+}
+.status.conectado{background:#22c55e}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+.cats{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);overflow-x:auto}
+.cat-btn{border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:11px;background:white;cursor:pointer;white-space:nowrap;transition:all .15s}
+.cat-btn.on{background:var(--red);color:white;border-color:var(--red)}
+
+.menu{padding:10px;max-height:400px;overflow-y:auto}
+.dish{background:var(--gray);border-radius:10px;padding:10px;margin-bottom:8px;display:flex;gap:10px;align-items:center}
+.dish-emoji{font-size:30px;flex-shrink:0}
+.dish-info{flex:1;min-width:0}
+.dish-name{font-size:12px;font-weight:600}
+.dish-desc{font-size:10px;color:var(--text2);margin:2px 0 4px}
+.dish-price{font-size:12px;font-weight:700;color:var(--red)}
+.add-btn{background:var(--green);color:white;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;font-weight:700;cursor:pointer;flex-shrink:0;transition:all .15s}
+.add-btn:active{transform:scale(.9)}
+
+.cart-bar{border-top:1px solid var(--border);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;background:var(--gray)}
+.cart-info{font-size:12px}
+.cart-total{font-weight:700;color:var(--red);font-size:15px}
+.order-btn{background:var(--green);color:white;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer}
+.order-btn:disabled{background:#ccc;cursor:default}
+
+.confirm-screen{display:none;padding:30px 20px;text-align:center}
+.confirm-screen.show{display:block}
+.confirm-icon{font-size:50px;margin-bottom:10px}
+.confirm-title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--green);margin-bottom:6px}
+.confirm-desc{font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.5}
+.confirm-detail{background:var(--gray);border-radius:10px;padding:12px;font-size:11px;margin-bottom:14px;text-align:left;line-height:1.6}
+.detail-row{display:flex;justify-content:space-between;padding:3px 0}
+.detail-row strong{color:var(--red)}
+.new-order-btn{background:var(--red);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:12px;font-weight:600;cursor:pointer}
+
+.loading{text-align:center;padding:20px;color:var(--text2)}
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid #ddd;border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.error{background:#fee;border:1px solid #fcc;color:#c33;padding:10px 12px;border-radius:8px;font-size:11px;margin:10px}
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="head">
+    <span class="status" id="status"></span>
+    <div class="head-logo">🍕</div>
+    <div class="head-name">Begli Fratelli's</div>
+    <div class="head-mesa" id="mesa-label">Mesa 3 · Piso 1</div>
+  </div>
+
+  <div id="loading-screen" class="loading">
+    <div class="spinner"></div>
+    <div style="margin-top:10px;font-size:12px">Cargando menú...</div>
+  </div>
+
+  <div id="menu-screen" style="display:none">
+    <div class="cats">
+      <div class="cat-btn on" onclick="filterCat(this,'todas')">Todas</div>
+      <div class="cat-btn" onclick="filterCat(this,'hamburguesas')">Hamburguesas</div>
+      <div class="cat-btn" onclick="filterCat(this,'pizzas')">Pizzas</div>
+      <div class="cat-btn" onclick="filterCat(this,'bebidas')">Bebidas</div>
+      <div class="cat-btn" onclick="filterCat(this,'extras')">Extras</div>
+    </div>
+    <div class="menu" id="menu-list"></div>
+    <div class="cart-bar">
+      <div class="cart-info">
+        <div id="cart-count">0 platos</div>
+        <div class="cart-total" id="cart-total">$0.00</div>
+      </div>
+      <button class="order-btn" id="order-btn" disabled onclick="enviarPedido()">Pedir →</button>
+    </div>
+  </div>
+
+  <div class="confirm-screen" id="confirm-screen">
+    <div class="confirm-icon">✅</div>
+    <div class="confirm-title">¡Pedido enviado!</div>
+    <div class="confirm-desc">Tu pedido ya está en la cocina. La cajera te llamará cuando esté listo.</div>
+    <div class="confirm-detail" id="confirm-detail"></div>
+    <button class="new-order-btn" onclick="nuevoPedido()">Hacer otro pedido</button>
+  </div>
+
+  <div class="error" id="error" style="display:none"></div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js"></script>
+
+<script>
+// ===== CONFIGURACIÓN FIREBASE =====
+// REEMPLAZA ESTOS VALORES con los tuyos (paso 1-2 abajo)
+const firebaseConfig = {
+  apiKey: "AIzaSyBI6MjIl_obOd4eKV-p-phEEOisM_61_L0",
+  authDomain: "begli-fratelli-s.firebaseapp.com",
+  databaseURL: "https://begli-fratelli-s-default-rtdb.firebaseio.com",
+  projectId: "begli-fratelli-s",
+  storageBucket: "begli-fratelli-s.firebasestorage.app",
+  messagingSenderId: "712897993318",
+  appId: "1:712897993318:web:45cdf8879f0981d65eaba7"
+};
+
+// Inicializa Firebase
+let app, database;
+try{
+  app = firebase.initializeApp(firebaseConfig);
+  database = firebase.database(app);
+  document.getElementById('status').classList.add('conectado');
+} catch(e){
+  showError('Error conectando Firebase. Verifica configuración.');
+  console.error(e);
+}
+
+// ===== MENÚ DATOS =====
+const MENU=[
+  {nombre:'Sanguche Champiñones',precio:4,cat:'hamburguesas',desc:'Pollo, champiñones, salsa BBQ',emoji:'🍗'},
+  {nombre:'Hamburguesa Clásica',precio:5.5,cat:'hamburguesas',desc:'Carne, cheddar, lechuga, tomate',emoji:'🍔'},
+  {nombre:'Hamburguesa Mixta',precio:6,cat:'hamburguesas',desc:'Carne, pollo, queso, champiñones',emoji:'🍔'},
+  {nombre:'Hamburguesa VIP',precio:7.5,cat:'hamburguesas',desc:'Doble carne, queso, tocino, huevo',emoji:'🍔'},
+  {nombre:'Pizza Mediana',precio:6,cat:'pizzas',desc:'Tomate, queso, jamón, champiñones',emoji:'🍕'},
+  {nombre:'Pizza Grande',precio:9,cat:'pizzas',desc:'Tomate, queso, jamón, champiñones, aceitunas',emoji:'🍕'},
+  {nombre:'Pizza Mixta Familiar',precio:12,cat:'pizzas',desc:'Carnes variadas, queso triple, vegetales',emoji:'🍕'},
+  {nombre:'Gaseosa Lata',precio:1.5,cat:'bebidas',desc:'Cola, Sprite, Fanta',emoji:'🥤'},
+  {nombre:'Jugo Natural',precio:2,cat:'bebidas',desc:'Naranja, fresa, maracuyá',emoji:'🧃'},
+  {nombre:'Agua Embotellada',precio:1,cat:'bebidas',desc:'500ml',emoji:'💧'},
+  {nombre:'Papas Fritas',precio:2.5,cat:'extras',desc:'Porción grande, sal, kétchup',emoji:'🍟'},
+  {nombre:'Alitas de Pollo',precio:3.5,cat:'extras',desc:'6 unidades, salsa BBQ',emoji:'🍗'},
+];
+
+// ===== OBTENER MESA DEL URL =====
+const urlParams = new URLSearchParams(window.location.search);
+const mesaParam = urlParams.get('mesa') || '3';
+const MESA = 'Mesa ' + mesaParam;
+document.getElementById('mesa-label').textContent = MESA + ' · Piso 1';
+
+let carrito=[];
+
+function renderMenu(){
+  document.getElementById('menu-list').innerHTML = MENU.map((p,i)=>`
+    <div class="dish" data-cat="${p.cat}">
+      <div class="dish-emoji">${p.emoji}</div>
+      <div class="dish-info">
+        <div class="dish-name">${p.nombre}</div>
+        <div class="dish-desc">${p.desc}</div>
+        <div class="dish-price">$${p.precio.toFixed(2)}</div>
+      </div>
+      <button class="add-btn" onclick="addCarrito(${i})">+</button>
+    </div>
+  `).join('');
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('menu-screen').style.display='block';
+}
+
+function filterCat(el,cat){
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  document.querySelectorAll('.dish').forEach(d=>{
+    d.style.display=(cat==='todas'||d.dataset.cat===cat)?'flex':'none';
+  });
+}
+
+function addCarrito(i){
+  carrito.push(MENU[i]);
+  actualizarCarrito();
+}
+
+function actualizarCarrito(){
+  const total = carrito.reduce((s,p)=>s+p.precio,0);
+  document.getElementById('cart-count').textContent = carrito.length+' platos';
+  document.getElementById('cart-total').textContent = '$'+total.toFixed(2);
+  document.getElementById('order-btn').disabled = carrito.length===0;
+}
+
+async function enviarPedido(){
+  if(carrito.length===0) return;
+  const total = carrito.reduce((s,p)=>s+p.precio,0);
+  
+  const pedido = {
+    id: 'P'+Date.now(),
+    mesa: MESA,
+    items: carrito.map(p=>({nombre:p.nombre,precio:p.precio})),
+    total: total,
+    hora: new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'}),
+    estado: 'nuevo_en_caja',
+    timestamp: firebase.database.ServerValue.TIMESTAMP
+  };
+
+  try{
+    // Guarda en Firebase bajo "pedidos/[id]"
+    await database.ref('pedidos/'+pedido.id).set(pedido);
+    
+    // Muestra confirmación
+    const items = carrito.map(p=>p.nombre).join('<br>');
+    document.getElementById('confirm-detail').innerHTML = `
+      <div class="detail-row"><span>${MESA}</span><span style="color:var(--text)">${carrito.length} platos</span></div>
+      <div class="detail-row"><span style="font-size:10px;margin-top:6px">${items}</span></div>
+      <div class="detail-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+        <span><strong>Total</strong></span>
+        <span><strong>$${total.toFixed(2)}</strong></span>
+      </div>
+    `;
+    
+    document.getElementById('menu-screen').style.display='none';
+    document.getElementById('confirm-screen').classList.add('show');
+  } catch(e){
+    showError('Error enviando pedido: '+e.message);
+  }
+}
+
+function nuevoPedido(){
+  carrito=[];
+  actualizarCarrito();
+  document.getElementById('menu-screen').style.display='block';
+  document.getElementById('confirm-screen').classList.remove('show');
+}
+
+function showError(msg){
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.style.display='block';
+}
+
+// Carga menú al abrir
+renderMenu();
+</script>
+
+<hr style="margin-top:40px;border:none;border-top:1px solid #ccc">
+
+<div style="max-width:920px;margin:40px auto;padding:0 20px;font-family:monospace;font-size:12px;color:#333;line-height:1.8">
+<h2 style="font-family:sans-serif;margin-bottom:16px">📋 GUÍA INSTALACIÓN — Cliente para Vercel + Firebase</h2>
+
+<div style="background:#f5f5f5;padding:16px;border-radius:8px;margin-bottom:16px">
+
+<h3 style="margin-bottom:10px;font-family:sans-serif">PASO 1: Crear proyecto Firebase</h3>
+<pre style="background:white;padding:12px;border-radius:4px;overflow-x:auto">
+1. Entra console.firebase.google.com
+2. Click "Crear proyecto" → nombre: "begli-fratelli"
+3. Espera a que se cree
+4. Entra al proyecto
+5. Izquierda → "Realtime Database"
+6. Click "Crear base de datos"
+7. Ubicación: elegir cercano (ej: us-central1)
+8. Reglas: selecciona "Comenzar en modo de prueba"
+9. Confirma
+</pre>
+
+<h3 style="margin-bottom:10px;font-family:sans-serif">PASO 2: Obtener credenciales</h3>
+<pre style="background:white;padding:12px;border-radius:4px;overflow-x:auto">
+1. Click engranaje (⚙) arriba izquierda → "Configuración del proyecto"
+2. Tab "General"
+3. Abajo → "Aplicaciones de Firebase" → click </> (web)
+4. Nombre: "begli-web"
+5. COPIA el objeto firebaseConfig (tiene todos los valores)
+6. Reemplaza en código arriba donde dice:
+   const firebaseConfig = { ... }
+</pre>
+
+<h3 style="margin-bottom:10px;font-family:sans-serif">PASO 3: Configurar reglas Firebase (IMPORTANTE)</h3>
+<pre style="background:white;padding:12px;border-radius:4px;overflow-x:auto">
+En Realtime Database:
+1. Tab "Reglas"
+2. Reemplaza con esto:
+{
+  "rules": {
+    "pedidos": {
+      ".read": true,
+      ".write": true
+    },
+    "usuarios": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
+3. Click "Publicar"
+(NOTA: esto es para demo. Producción = seguridad más estricta)
+</pre>
+
+<h3 style="margin-bottom:10px;font-family:sans-serif">PASO 4: Subir a Vercel</h3>
+<pre style="background:white;padding:12px;border-radius:4px;overflow-x:auto">
+1. Guarda este archivo como "cliente.html"
+2. Entra vercel.com → Sign in con GitHub
+3. Click "Add New..." → "Project"
+4. "Import Git Repository" → crea repo GitHub con archivo
+   (O sube carpeta sin Git → "Deploy"
+5. Vercel publica automático → te da link tipo:
+   https://begli-fratelli.vercel.app/cliente.html
+6. Para mesa específica: 
+   https://begli-fratelli.vercel.app/cliente.html?mesa=3
+7. Genera QR ese link → imprime en mesa
+</pre>
+
+<h3 style="margin-bottom:10px;font-family:sans-serif">PASO 5: Generar QR por mesa (gratis)</h3>
+<pre style="background:white;padding:12px;border-radius:4px;overflow-x:auto">
+1. Entra qr-code-generator.com
+2. URL: https://tudominio.vercel.app/cliente.html?mesa=1
+3. Descarga imagen QR
+4. Imprime 1 por cada mesa
+5. Pega en mesa
+</pre>
+
+<h3 style="margin-bottom:10px;font-family:sans-serif">Verificar funcionamiento</h3>
+<pre style="background:white;padding:12px;border-radius:4px;overflow-x:auto">
+1. Abre cliente.html en navegador
+2. Agrega platos → click "Pedir"
+3. Entra Firebase Console → Realtime Database
+4. Deberías ver "pedidos" con el pedido que mandaste
+5. ¡Funciona! Caja y Cocina pueden leer eso
+</pre>
+
+</div>
+
+<h3 style="font-family:sans-serif;margin-top:30px">Próximo paso: Caja y Cocina</h3>
+<p>Cuando cliente funcione, creamos caja.html y cocina.html que LEEN de la misma base datos Firebase.</p>
+
+</div>
+
+</body>
+</html>
