@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="es">
+<!--
+=======================================================
+  BEGLI FRATELLI'S — SISTEMA DE PEDIDOS — CLIENTE
+  Archivo: cliente_firebase.html  |  Version: 2.0
+  Secciones:
+    HTML · CSS · Variables · Base de datos ·
+    Funciones de mesas · Funciones de pedidos ·
+    Funciones de ventas · Eventos
+=======================================================
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Begli Fratelli\'s — Pedir en Linea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<!-- Firebase SDK 10 en modo compat (funciona con script tags normales) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+</head>
+<body>
+
+
+<!-- =======================
+     HTML
+     Solo estructura visual.
+     Sin logica. Sin estilos inline.
+======================= -->
+
+<div class="fondo">
+  <div class="celular">
+
+    <!-- CABECERA: logo, nombre restaurante, mesa activa -->
+    <header class="cabecera">
+      <span class="indicador-conexion" id="indicadorConexion"></span>
+      <div class="cabecera-logo">&#127829;</div>
+      <div class="cabecera-nombre">Begli Fratelli\'s</div>
+      <div class="cabecera-mesa" id="etiquetaMesa">Mesa 3 &middot; Naranjal</div>
+    </header>
+
+    <!-- PANTALLA: Cargando (visible al inicio) -->
+    <section class="pantalla" id="pantallaCarga">
+      <div class="spinner"></div>
+      <p class="texto-carga">Cargando menu...</p>
+    </section>
+
+    <!-- PANTALLA: Menu + carrito -->
+    <section class="pantalla oculto" id="pantallaMenu">
+      <div class="categorias" id="contenedorCategorias">
+        <button class="btn-categoria activo" data-cat="todas">Todas</button>
+        <button class="btn-categoria" data-cat="hamburguesas">Hamburguesas</button>
+        <button class="btn-categoria" data-cat="pizzas">Pizzas</button>
+        <button class="btn-categoria" data-cat="bebidas">Bebidas</button>
+        <button class="btn-categoria" data-cat="extras">Extras</button>
+      </div>
+      <div class="lista-platos" id="listaPlatos"></div>
+      <div class="barra-carrito">
+        <div class="carrito-info">
+          <span class="carrito-cantidad" id="carritoContador">0 platos</span>
+          <span class="carrito-total"    id="carritoTotal">$0.00</span>
+        </div>
+        <button class="btn-pedir" id="btnPedir" disabled>Pedir &#8594;</button>
+      </div>
+    </section>
+
+    <!-- PANTALLA: Confirmacion pedido enviado -->
+    <section class="pantalla oculto" id="pantallaConfirmacion">
+      <div class="confirmacion-contenido">
+        <div class="confirmacion-icono">&#9989;</div>
+        <h2 class="confirmacion-titulo">&#161;Pedido enviado!</h2>
+        <p class="confirmacion-desc">Tu pedido ya esta en camino a la cocina.<br>La cajera te avisara cuando este listo.</p>
+        <div class="confirmacion-detalle" id="confirmacionDetalle"></div>
+        <button class="btn-nuevo-pedido" id="btnNuevoPedido">Hacer otro pedido</button>
+      </div>
+    </section>
+
+    <!-- BANNER: Errores (aparece solo si algo falla) -->
+    <div class="banner-error oculto" id="bannerError">
+      <span id="textoError"></span>
+    </div>
+
+  </div><!-- /celular -->
+</div><!-- /fondo -->
+
+
+<style>
+/* =======================
+   CSS
+   Variables -> Reset -> Fondo ->
+   Cabecera -> Pantallas -> Platos ->
+   Carrito -> Confirmacion -> Errores
+======================= */
+
+/* ---- 1. Variables globales ---- */
+:root {
+  --rojo:        #c41e3a;
+  --verde:       #2d8659;
+  --gris-fondo:  #f0f0f0;
+  --gris-carta:  #f5f5f5;
+  --borde:       #ddd;
+  --texto:       #333;
+  --texto-suave: #666;
+  --blanco:      #fff;
+  --verde-claro: #22c55e;
+  --fuente:      'Inter', sans-serif;
+  --fuente-h:    'Space Grotesk', sans-serif;
+}
+
+/* ---- 2. Reset ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; }
+body {
+  font-family: var(--fuente);
+  font-size: 13px;
+  color: var(--texto);
+  background: var(--gris-fondo);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* ---- 3. Contenedor principal ---- */
+.fondo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Simula pantalla de celular */
+.celular {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  height: 90vh;
+  max-height: 800px;
+  background: var(--blanco);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- 4. Cabecera ---- */
+.cabecera {
+  background: linear-gradient(135deg, var(--rojo), var(--verde));
+  color: var(--blanco);
+  text-align: center;
+  padding: 24px 16px 14px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Punto de conexion: gris = sin conexion, verde = conectado */
+.indicador-conexion {
+  position: absolute;
+  top: 10px; right: 12px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #aaa;
+  animation: pulso 2s infinite;
+}
+.indicador-conexion.conectado {
+  background: var(--verde-claro);
+  box-shadow: 0 0 6px var(--verde-claro);
+  animation: none;
+}
+@keyframes pulso { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+.cabecera-logo   { font-size: 30px; margin-bottom: 4px; }
+.cabecera-nombre { font-family: var(--fuente-h); font-size: 17px; font-weight: 700; }
+.cabecera-mesa   { font-size: 11px; opacity: .9; margin-top: 3px; }
+
+/* ---- 5. Sistema de pantallas ---- */
+.pantalla { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.oculto   { display: none !important; }
+
+/* Pantalla de carga */
+#pantallaCarga { align-items: center; justify-content: center; gap: 12px; }
+.spinner {
+  width: 24px; height: 24px;
+  border: 3px solid var(--borde);
+  border-top-color: var(--verde);
+  border-radius: 50%;
+  animation: girar .8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+.texto-carga { color: var(--texto-suave); font-size: 12px; }
+
+/* ---- 6. Categorias ---- */
+.categorias {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--borde);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.categorias::-webkit-scrollbar { display: none; }
+
+.btn-categoria {
+  padding: 5px 13px;
+  font-size: 11px;
+  font-family: var(--fuente);
+  border: 1px solid var(--borde);
+  border-radius: 20px;
+  background: var(--blanco);
+  color: var(--texto);
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 500;
+  transition: all .15s;
+}
+.btn-categoria.activo { background: var(--rojo); border-color: var(--rojo); color: var(--blanco); }
+
+/* ---- 7. Tarjetas de platos ---- */
+.lista-platos {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tarjeta-plato {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--gris-carta);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.plato-emoji       { font-size: 30px; flex-shrink: 0; }
+.plato-info        { flex: 1; min-width: 0; }
+.plato-nombre      { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+.plato-descripcion { font-size: 10px; color: var(--texto-suave); margin-bottom: 4px; line-height: 1.3; }
+.plato-precio      { font-size: 12px; font-weight: 700; color: var(--rojo); }
+
+.btn-agregar {
+  width: 34px; height: 34px;
+  background: var(--verde);
+  color: var(--blanco);
+  border: none;
+  border-radius: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, transform .1s;
+  line-height: 1;
+}
+.btn-agregar:active { background: #1d6a47; transform: scale(.9); }
+
+/* ---- 8. Barra del carrito ---- */
+.barra-carrito {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--borde);
+  background: var(--gris-carta);
+  flex-shrink: 0;
+}
+
+.carrito-info     { display: flex; flex-direction: column; gap: 2px; }
+.carrito-cantidad { font-size: 11px; color: var(--texto-suave); }
+.carrito-total    { font-size: 16px; font-weight: 700; color: var(--rojo); }
+
+.btn-pedir {
+  padding: 10px 18px;
+  background: var(--verde);
+  color: var(--blanco);
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--fuente);
+  cursor: pointer;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.btn-pedir:active   { background: #1d6a47; }
+.btn-pedir:disabled { background: #ccc; cursor: not-allowed; }
+
+/* ---- 9. Pantalla de confirmacion ---- */
+#pantallaConfirmacion {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow-y: auto;
+}
+.confirmacion-contenido { text-align: center; width: 100%; }
+.confirmacion-icono     { font-size: 48px; margin-bottom: 12px; }
+.confirmacion-titulo    { font-family: var(--fuente-h); font-size: 18px; font-weight: 700; color: var(--verde); margin-bottom: 8px; }
+.confirmacion-desc      { font-size: 12px; color: var(--texto-suave); line-height: 1.6; margin-bottom: 16px; }
+
+.confirmacion-detalle {
+  background: var(--gris-carta);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 11px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+.fila-detalle {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--borde);
+}
+.fila-detalle:last-of-type { border-bottom: none; }
+.fila-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0 0;
+  font-weight: 700;
+  color: var(--texto);
+  margin-top: 4px;
+}
+
+.btn-nuevo-pedido {
+  padding: 10px 20px;
+  background: var(--rojo);
+  color: var(--blanco);
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--fuente);
+  cursor: pointer;
+  transition: background .15s;
+}
+.btn-nuevo-pedido:active { background: #a01730; }
+
+/* ---- 10. Banner de error ---- */
+.banner-error {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fee;
+  border: 1px solid #fcc;
+  color: #c33;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 11px;
+  white-space: nowrap;
+  max-width: 90%;
+  z-index: 100;
+}
+
+/* ---- 11. Responsive ---- */
+@media (max-width: 400px) {
+  body { padding: 0; }
+  .celular { max-width: 100%; height: 100vh; max-height: none; border-radius: 0; }
+}
+</style>
+
+
+<script>
+/* =======================
+   VARIABLES
+   Todo lo que puede cambiar esta aqui.
+   Credenciales, menu, estado del sistema.
+======================= */
+
+// Credenciales Firebase — proyecto Begli Fratelli's
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBI6MjIl_obOd4eKV-p-phEEOisM_61_L0",
+  authDomain:        "begli-fratelli-s.firebaseapp.com",
+  databaseURL:       "https://begli-fratelli-s-default-rtdb.firebaseio.com",
+  projectId:         "begli-fratelli-s",
+  storageBucket:     "begli-fratelli-s.firebasestorage.app",
+  messagingSenderId: "712897993318",
+  appId:             "1:712897993318:web:45cdf8879f0981d65eaba7",
+  measurementId:     "G-CLKLE8NK6L"
+};
+
+// Datos del restaurante
+const RESTAURANTE = {
+  nombre:   "Begli Fratelli's",
+  ciudad:   "Naranjal, Guayas",
+  whatsapp: "0993100997"
+};
+
+// Menu completo — para agregar un plato copia una linea y cambia los valores
+const MENU = [
+  { nombre:"Sanguche Campanones",  precio:4.00,  cat:"hamburguesas", desc:"Pollo, campanones, salsa BBQ",                emoji:"\u{1F357}" },
+  { nombre:"Hamburguesa Clasica",  precio:5.50,  cat:"hamburguesas", desc:"Carne, cheddar, lechuga, tomate",             emoji:"\u{1F354}" },
+  { nombre:"Hamburguesa Mixta",    precio:6.00,  cat:"hamburguesas", desc:"Carne, pollo, queso, campanones",             emoji:"\u{1F354}" },
+  { nombre:"Hamburguesa VIP",      precio:7.50,  cat:"hamburguesas", desc:"Doble carne, queso, tocino, huevo",           emoji:"\u{1F354}" },
+  { nombre:"Pizza Mediana",        precio:6.00,  cat:"pizzas",       desc:"Tomate, queso, jamon, campanones",            emoji:"\u{1F355}" },
+  { nombre:"Pizza Grande",         precio:9.00,  cat:"pizzas",       desc:"Tomate, queso, jamon, campanones, aceitunas", emoji:"\u{1F355}" },
+  { nombre:"Pizza Mixta Familiar", precio:12.00, cat:"pizzas",       desc:"Carnes variadas, queso triple, vegetales",    emoji:"\u{1F355}" },
+  { nombre:"Gaseosa Lata",         precio:1.50,  cat:"bebidas",      desc:"Cola, Sprite, Fanta",                         emoji:"\u{1F964}" },
+  { nombre:"Jugo Natural",         precio:2.00,  cat:"bebidas",      desc:"Naranja, fresa, maracuya",                    emoji:"\u{1F9C3}" },
+  { nombre:"Agua Embotellada",     precio:1.00,  cat:"bebidas",      desc:"500ml",                                       emoji:"\u{1F4A7}" },
+  { nombre:"Papas Fritas",         precio:2.50,  cat:"extras",       desc:"Porcion grande, sal, ketchup",                emoji:"\u{1F35F}" },
+  { nombre:"Alitas de Pollo",      precio:3.50,  cat:"extras",       desc:"6 unidades, salsa BBQ",                       emoji:"\u{1F357}" },
+];
+
+// Estado interno — no modificar directamente desde afuera
+let _db      = null;    // Referencia a Firebase Database
+let _carrito = [];      // Items activos: [{nombre, precio, cantidad}]
+let _mesa    = "Mesa 3"; // Se sobreescribe con la URL al iniciar
+
+
+/* =======================
+   BASE DE DATOS
+   Conexion y operaciones con Firebase.
+   Solo esta seccion habla con la nube.
+======================= */
+
+/**
+ * Conecta Firebase usando FIREBASE_CONFIG.
+ * Si falla, el menu sigue funcionando pero no se pueden enviar pedidos.
+ */
+function inicializarFirebase() {
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    _db = firebase.database();
+    document.getElementById("indicadorConexion").classList.add("conectado");
+    console.log("Firebase conectado");
+  } catch (err) {
+    console.error("Firebase fallo:", err.message);
+    mostrarError("Sin conexion al servidor. Recarga la pagina.");
+  }
+}
+
+/**
+ * Guarda el pedido en Firebase bajo la ruta /pedidos/{id}.
+ * Agrega timestamp del servidor (mas preciso que el reloj local).
+ * @param {Object} pedido — objeto completo del pedido
+ */
+async function guardarPedidoEnFirebase(pedido) {
+  if (!_db) throw new Error("Firebase no disponible");
+
+  await _db.ref("pedidos/" + pedido.id).set({
+    ...pedido,
+    timestamp: firebase.database.ServerValue.TIMESTAMP
+  });
+
+  console.log("Pedido guardado:", pedido.id);
+}
+
+
+/* =======================
+   FUNCIONES DE MESAS
+   Lee la mesa de la URL y la muestra en pantalla.
+   Cada QR apunta a una URL con ?mesa=N diferente.
+======================= */
+
+/**
+ * Lee el parametro ?mesa=N de la URL.
+ * Ejemplo: /cliente_firebase.html?mesa=5 => "Mesa 5"
+ * Si no hay parametro, usa mesa 3 por defecto.
+ * @returns {string} "Mesa N"
+ */
+function leerMesaDesdeURL() {
+  const params = new URLSearchParams(window.location.search);
+  return "Mesa " + (params.get("mesa") || "3");
+}
+
+/**
+ * Actualiza el texto de la mesa en la cabecera.
+ * @param {string} mesa "Mesa 5"
+ */
+function mostrarMesaEnCabecera(mesa) {
+  document.getElementById("etiquetaMesa").textContent =
+    mesa + " \u00B7 " + RESTAURANTE.ciudad;
+}
+
+
+/* =======================
+   FUNCIONES DE PEDIDOS
+   Manejo del menu, carrito y envio de pedidos.
+======================= */
+
+/**
+ * Crea las tarjetas HTML de cada plato del MENU
+ * y las inserta en el contenedor #listaPlatos.
+ */
+function renderizarMenu() {
+  const contenedor = document.getElementById("listaPlatos");
+  contenedor.innerHTML = "";
+
+  MENU.forEach(function(plato) {
+    const div = document.createElement("div");
+    div.className   = "tarjeta-plato";
+    div.dataset.cat = plato.cat;
+
+    div.innerHTML =
+      '<div class="plato-emoji">'      + plato.emoji + '</div>' +
+      '<div class="plato-info">' +
+        '<div class="plato-nombre">'      + plato.nombre            + '</div>' +
+        '<div class="plato-descripcion">' + plato.desc              + '</div>' +
+        '<div class="plato-precio">$'     + plato.precio.toFixed(2) + '</div>' +
+      '</div>' +
+      '<button class="btn-agregar">+</button>';
+
+    // Click en "+" agrega el plato al carrito
+    div.querySelector(".btn-agregar").addEventListener("click", function() {
+      agregarAlCarrito(plato);
+    });
+
+    contenedor.appendChild(div);
+  });
+}
+
+/**
+ * Muestra solo los platos de la categoria seleccionada.
+ * "todas" muestra todos.
+ * @param {string} cat nombre de la categoria
+ */
+function filtrarCategoria(cat) {
+  document.querySelectorAll(".tarjeta-plato").forEach(function(t) {
+    if (cat === "todas" || t.dataset.cat === cat) {
+      t.classList.remove("oculto");
+    } else {
+      t.classList.add("oculto");
+    }
+  });
+}
+
+/**
+ * Agrega un plato al carrito.
+ * Si el plato ya existe, suma 1 a su cantidad.
+ * @param {Object} plato objeto del MENU
+ */
+function agregarAlCarrito(plato) {
+  const existe = _carrito.find(function(i) { return i.nombre === plato.nombre; });
+  if (existe) {
+    existe.cantidad++;
+  } else {
+    _carrito.push({ nombre: plato.nombre, precio: plato.precio, cantidad: 1 });
+  }
+  actualizarCarritoUI();
+}
+
+/**
+ * Recalcula los totales y actualiza la barra inferior.
+ * Tambien habilita o deshabilita el boton "Pedir".
+ */
+function actualizarCarritoUI() {
+  const totalItems  = _carrito.reduce(function(s,i){ return s + i.cantidad; }, 0);
+  const totalPrecio = _carrito.reduce(function(s,i){ return s + i.precio * i.cantidad; }, 0);
+
+  document.getElementById("carritoContador").textContent =
+    totalItems === 1 ? "1 plato" : totalItems + " platos";
+  document.getElementById("carritoTotal").textContent =
+    "$" + totalPrecio.toFixed(2);
+  document.getElementById("btnPedir").disabled = (_carrito.length === 0);
+}
+
+/**
+ * Construye el objeto del pedido con todos los datos
+ * necesarios para guardarlo en Firebase.
+ * @returns {Object} pedido listo para Firebase
+ */
+function construirPedido() {
+  const hora  = new Date().toLocaleTimeString("es", { hour:"2-digit", minute:"2-digit" });
+  const total = _carrito.reduce(function(s,i){ return s + i.precio * i.cantidad; }, 0);
+  return {
+    id:     "P" + Date.now(),  // ID unico basado en tiempo Unix
+    mesa:   _mesa,
+    items:  _carrito.slice(),  // Copia del carrito (no referencia)
+    total:  total,
+    hora:   hora,
+    estado: "nuevo_en_caja"    // La cajera lo vera con este estado en caja.html
+  };
+}
+
+/**
+ * Valida, construye y envia el pedido a Firebase.
+ * Muestra confirmacion si sale bien, error si falla.
+ */
+async function enviarPedido() {
+  if (_carrito.length === 0) return;
+
+  const btn = document.getElementById("btnPedir");
+  btn.disabled    = true;
+  btn.textContent = "Enviando...";
+
+  try {
+    const pedido = construirPedido();
+    await guardarPedidoEnFirebase(pedido);
+
+    // Muestra pantalla de confirmacion
+    mostrarConfirmacion(pedido);
+
+    // Vacia el carrito para el proximo pedido
+    _carrito = [];
+    actualizarCarritoUI();
+
+  } catch (err) {
+    console.error("Error enviando pedido:", err.message);
+    mostrarError("Error al enviar. Intenta de nuevo.");
+    btn.disabled    = false;
+    btn.textContent = "Pedir \u2192";
+  }
+}
+
+/**
+ * Llena el cuadro de detalles y muestra la pantalla de confirmacion.
+ * @param {Object} pedido objeto del pedido enviado
+ */
+function mostrarConfirmacion(pedido) {
+  const filasItems = pedido.items.map(function(i) {
+    const sub = (i.precio * i.cantidad).toFixed(2);
+    const extra = i.cantidad > 1 ? " \u00D7" + i.cantidad : "";
+    return '<div class="fila-detalle"><span>' + i.nombre + extra + '</span><span>$' + sub + '</span></div>';
+  }).join("");
+
+  document.getElementById("confirmacionDetalle").innerHTML =
+    '<div class="fila-detalle"><span>Pedido #' + pedido.id.slice(-4) + '</span><span>' + pedido.hora + '</span></div>' +
+    '<div class="fila-detalle"><span>' + pedido.mesa + '</span><span>' + pedido.items.length + ' platos</span></div>' +
+    filasItems +
+    '<div class="fila-total"><span>Total</span><span>$' + pedido.total.toFixed(2) + '</span></div>';
+
+  cambiarPantalla("pantallaConfirmacion");
+}
+
+
+/* =======================
+   FUNCIONES DE VENTAS
+   (Esta pantalla no registra ventas —
+    eso lo hace la cajera en caja.html)
+   Reservado para historial del cliente en v2.
+======================= */
+
+// placeholder — se expande en futuras versiones
+
+
+/* =======================
+   EVENTOS
+   Aqui se conectan los botones con las funciones.
+   Es el punto de entrada de todo el sistema.
+======================= */
+
+document.addEventListener("DOMContentLoaded", function() {
+
+  // 1. Conectar Firebase
+  inicializarFirebase();
+
+  // 2. Leer mesa de la URL y mostrarla
+  _mesa = leerMesaDesdeURL();
+  mostrarMesaEnCabecera(_mesa);
+
+  // 3. Pintar el menu en pantalla
+  renderizarMenu();
+
+  // 4. Pasar a pantalla de menu (ocultar carga)
+  cambiarPantalla("pantallaMenu");
+
+  // 5. Clicks en botones de categoria
+  document.getElementById("contenedorCategorias")
+    .addEventListener("click", function(e) {
+      var btn = e.target.closest(".btn-categoria");
+      if (!btn) return;
+      document.querySelectorAll(".btn-categoria").forEach(function(b){ b.classList.remove("activo"); });
+      btn.classList.add("activo");
+      filtrarCategoria(btn.dataset.cat);
+    });
+
+  // 6. Boton "Pedir"
+  document.getElementById("btnPedir")
+    .addEventListener("click", enviarPedido);
+
+  // 7. Boton "Hacer otro pedido"
+  document.getElementById("btnNuevoPedido")
+    .addEventListener("click", function() {
+      cambiarPantalla("pantallaMenu");
+    });
+
+  console.log("Sistema listo:", _mesa, "|", RESTAURANTE.nombre);
+});
+
+// Muestra una pantalla y oculta todas las demas
+function cambiarPantalla(idActivo) {
+  ["pantallaCarga", "pantallaMenu", "pantallaConfirmacion"].forEach(function(id) {
+    document.getElementById(id).classList.toggle("oculto", id !== idActivo);
+  });
+}
+
+// Muestra un banner de error que desaparece en 4 segundos
+function mostrarError(msg) {
+  var banner = document.getElementById("bannerError");
+  document.getElementById("textoError").textContent = msg;
+  banner.classList.remove("oculto");
+  setTimeout(function(){ banner.classList.add("oculto"); }, 4000);
+}
+
+</script>
+</body>
+</html>
