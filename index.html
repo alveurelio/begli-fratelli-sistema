@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Caja — Begli Fratelli's</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+
+  <!-- =======================
+       ENCABEZADO
+  ======================= -->
+  <header class="encabezado">
+    <div class="encabezado-marca">
+      <span class="encabezado-logo">🍕</span>
+      <div>
+        <div class="encabezado-nombre">Begli Fratelli's</div>
+        <div class="encabezado-sub">Panel de Caja · Naranjal, Guayas</div>
+      </div>
+    </div>
+    <div class="encabezado-derecha">
+      <span class="reloj-caja" id="relojCaja">--:--</span>
+      <span class="indicador-conexion" id="indicadorConexion" title="Verificando conexión..."></span>
+    </div>
+  </header>
+
+  <!-- Banner visible cuando no hay conexión a internet -->
+  <div class="banner-sin-red" id="bannerSinRed">
+    ⚠ Sin conexión a Firebase — las acciones están bloqueadas hasta recuperar la red
+  </div>
+
+  <!-- =======================
+       BARRA DE PESTAÑAS (parte superior)
+  ======================= -->
+  <nav class="barra-pestanas">
+
+    <button class="btn-pestana activo" data-pestana="pedidos">
+      Pedidos
+      <span class="badge-pestana" id="badgePedidos"></span>
+    </button>
+
+    <button class="btn-pestana" data-pestana="estadisticas">
+      Caja del día
+    </button>
+
+    <button class="btn-pestana" data-pestana="gastos">
+      Gastos
+    </button>
+
+    <button class="btn-pestana" data-pestana="cierre">
+      Cierre
+    </button>
+
+    <button class="btn-pestana" data-pestana="historial">
+      Historial
+    </button>
+
+  </nav>
+
+  <!-- =======================
+       CONTENIDO PRINCIPAL
+  ======================= -->
+  <main class="contenido-principal">
+
+    <!-- PANEL: PEDIDOS -->
+    <div class="panel-pestana activo" id="panel-pedidos">
+      <div class="lista-pedidos" id="listaPedidos">
+        <!-- Se llena dinámicamente desde pedidos.js -->
+      </div>
+    </div>
+
+    <!-- PANEL: ESTADÍSTICAS / CAJA DEL DÍA -->
+    <div class="panel-pestana" id="panel-estadisticas">
+      <div id="contenidoEstadisticas">
+        <!-- Se llena dinámicamente desde estadisticas.js -->
+      </div>
+    </div>
+
+    <!-- PANEL: GASTOS -->
+    <div class="panel-pestana" id="panel-gastos">
+      <div id="contenidoGastos">
+        <!-- Se llena dinámicamente desde gastos.js -->
+      </div>
+    </div>
+
+    <!-- PANEL: CIERRE DE CAJA -->
+    <div class="panel-pestana" id="panel-cierre">
+      <div id="contenidoCierre">
+        <!-- Se llena dinámicamente desde app.js → cargarCierre() -->
+      </div>
+    </div>
+
+    <!-- PANEL: HISTORIAL -->
+    <div class="panel-pestana" id="panel-historial">
+      <div id="contenidoHistorial">
+        <!-- Se llena dinámicamente desde historial.js -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- =======================
+       PANEL DE DETALLE DEL PEDIDO
+       (aparece como drawer desde abajo)
+  ======================= -->
+  <div class="panel-detalle" id="panelDetalle">
+    <div class="contenido-detalle" id="contenidoDetalle">
+      <!-- Se llena dinámicamente desde pedidos.js → abrirDetallePedido() -->
+    </div>
+  </div>
+
+  <!-- =======================
+       MODAL DE CONFIRMACIÓN GLOBAL
+  ======================= -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-caja">
+      <div class="modal-titulo"  id="modalTitulo">Confirmar</div>
+      <div class="modal-mensaje" id="modalMensaje"></div>
+      <div class="modal-acciones">
+        <button class="modal-btn-confirmar" id="modalBtnConfirmar">Confirmar</button>
+        <button class="modal-btn-cancelar"  id="modalBtnCancelar">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =======================
+       TOAST DE NOTIFICACIONES
+  ======================= -->
+  <div class="toast" id="toast"></div>
+
+  <!-- =======================
+       FIREBASE SDK (versión compat)
+  ======================= -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+  <!-- =======================
+       SCRIPTS DEL PROYECTO
+       (en orden de dependencia)
+  ======================= -->
+  <script src="js/utils.js"></script>
+  <script src="js/firebase.js"></script>
+  <script src="js/pedidos.js"></script>
+  <script src="js/estadisticas.js"></script>
+  <script src="js/gastos.js"></script>
+  <script src="js/historial.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
